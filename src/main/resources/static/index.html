@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CoEdit Studio</title>
+    <!-- SockJS and Stomp.js from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; margin: 20px; background-color: #f4f4f9; display: flex; flex-direction: column; align-items: center; }
+        #editor { width: 80%; height: 500px; padding: 15px; font-size: 16px; border-radius: 8px; border: 1px solid #ccc; font-family: monospace; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .status { margin-bottom: 10px; color: #555; }
+        .status span { font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>CoEdit Studio</h1>
+        <div class="status">Status: <span id="statusText">Disconnected</span> | Username: <span id="usernameDisplay">Unknown</span></div>
+    </div>
+
+    <textarea id="editor" placeholder="Start typing..."></textarea>
+
+    <script>
+        let stompClient = null;
+        let username = null;
+        const editor = document.getElementById('editor');
+        const statusText = document.getElementById('statusText');
+        const usernameDisplay = document.getElementById('usernameDisplay');
+
+        // Generate a random username or use a simple prompt
+        username = "User_" + Math.floor(Math.random() * 10000);
+        usernameDisplay.textContent = username;
+
+        function connect() {
+            const socket = new SockJS('/ws-coedit');
+            stompClient = Stomp.over(socket);
+            
+            // disable verbose logging
+            stompClient.debug = null;
+
+            stompClient.connect({}, onConnected, onError);
+        }
+
+        function onConnected() {
+            statusText.textContent = "Connected";
+            statusText.style.color = "green";
+
+            // Subscribe to the Public Topic
+            stompClient.subscribe('/topic/public', onMessageReceived);
+
+            // Tell your username to the server
+            stompClient.send("/app/editor.addUser",
+                {},
+                JSON.stringify({sender: username, type: 'JOIN'})
+            );
+        }
+
+        function onError(error) {
+            statusText.textContent = "Could not connect to WebSocket server. Please refresh this page to try again!";
+            statusText.style.color = "red";
+        }
+
+        function onMessageReceived(payload) {
+            const message = JSON.parse(payload.body);
+
+            if (message.type === 'JOIN') {
+                console.log(message.sender + " joined!");
+                // If it brings current context, we update (but simple LWW here might not initially)
+                if (message.content && message.sender === username) {
+                    editor.value = message.content;
+                }
+            } else if (message.type === 'LEAVE') {
+                console.log(message.sender + " left!");
+            } else {
+                // UPDATE message
+                // LWW Conflict Resolution (simple): Just replace if the sender isn't me
+                if (message.sender !== username) {
+                    const cursorPosition = editor.selectionStart;
+                    editor.value = message.content;
+                    
+                    // Simple cursor management: try to maintain if possible, or just append
+                    if (cursorPosition <= editor.value.length) {
+                        editor.selectionStart = cursorPosition;
+                        editor.selectionEnd = cursorPosition;
+                    }
+                }
+            }
+        }
+
+        function sendContentUpdate() {
+            if (stompClient) {
+                const message = {
+                    sender: username,
+                    content: editor.value,
+                    cursorPosition: editor.selectionStart,
+                    type: 'UPDATE'
+                };
+                stompClient.send("/app/editor.sendUpdate", {}, JSON.stringify(message));
+            }
+        }
+
+        // Listen for input events
+        editor.addEventListener('input', sendContentUpdate);
+
+        // Connect on page load
+        window.onload = connect;
+    </script>
+</body>
+</html>
