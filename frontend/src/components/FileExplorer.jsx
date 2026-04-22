@@ -4,10 +4,12 @@ export default function FileExplorer({ activeFileId, onSelectFile, jwt }) {
   const [files, setFiles] = useState([]);
   const [newFilename, setNewFilename] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  
+  const API_BASE = import.meta.env.VITE_API_URL || '';
 
   const fetchFiles = async () => {
     try {
-      const response = await fetch('/api/files', {
+      const response = await fetch(`${API_BASE}/api/files`, {
         headers: { 'Authorization': `Bearer ${jwt}` }
       });
       if (response.ok) {
@@ -26,7 +28,7 @@ export default function FileExplorer({ activeFileId, onSelectFile, jwt }) {
   const handleDownload = async (e, id, filename) => {
     e.stopPropagation(); // Prevent the file from being selected/opened
     try {
-      const response = await fetch(`/api/files/${id}`, {
+      const response = await fetch(`${API_BASE}/api/files/${id}`, {
         headers: { 'Authorization': `Bearer ${jwt}` }
       });
       if (response.ok) {
@@ -59,9 +61,10 @@ export default function FileExplorer({ activeFileId, onSelectFile, jwt }) {
     if (newFilename.endsWith('.py')) lang = 'python';
     if (newFilename.endsWith('.html')) lang = 'html';
     if (newFilename.endsWith('.css')) lang = 'css';
+    if (newFilename.endsWith('.md')) lang = 'markdown'; // markdown preview support
 
     try {
-      const response = await fetch('/api/files', {
+      const response = await fetch(`${API_BASE}/api/files`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${jwt}`,

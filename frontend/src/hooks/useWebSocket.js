@@ -10,8 +10,10 @@ export function useWebSocket(username, jwt, fileId) {
   useEffect(() => {
     if (!username || !jwt || !fileId) return;
 
+    const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8080/ws-coedit';
+
     stompClient.current = new Client({
-      brokerURL: 'ws://localhost:8080/ws-coedit',
+      brokerURL: wsUrl,
       connectHeaders: {
         Authorization: 'Bearer ' + jwt
       },

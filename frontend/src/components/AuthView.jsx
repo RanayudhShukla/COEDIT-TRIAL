@@ -6,10 +6,12 @@ export default function AuthView({ onLogin }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
 
+  const API_BASE = import.meta.env.VITE_API_URL || '';
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
-    const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+    const endpoint = isLogin ? `${API_BASE}/api/auth/login` : `${API_BASE}/api/auth/register`;
 
     try {
       const response = await fetch(endpoint, {
